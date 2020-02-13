@@ -48,7 +48,7 @@ time = float(f.readline())
 time_text.set_text("time = " + str(time))
 
 data=[]
-for j in range(NY):
+for _ in range(NY):
   tmp = list(map(float, f.readline().split()))
   data.append(tmp)
 
@@ -69,7 +69,7 @@ def update(cnt):
   
   # 二次元配列受け取り
   data=[]
-  for j in range(NY):
+  for _ in range(NY):
     tmp = list(map(float, f.readline().split()))
     data.append(tmp)
   
