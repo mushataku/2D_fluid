@@ -4,19 +4,19 @@
 #include <vector>
 #include <random>
 
-// 0:fixed 1:random
+// 0:fixed 1:random 2:point
 #define INITIAL 0
 // 0:fixed 1:periodic
 #define BOUNDARY 1
 // 0:upwind 1:central difference
-#define METHOD 1
+#define METHOD 0
 
 using vd = std::vector<double>;
 using vvd = std::vector<vd>;
 
 /******************************計算条件******************************/
-const int nx = 50+3;
-const int ny = 50+3;
+const int nx = 20+3;
+const int ny = 20+3;
 const double Lx = 1.0;
 const double Ly = 1.0;
 const double dx = Lx/double(nx-3);
@@ -60,11 +60,11 @@ int main(){
   initial(f);
   boundary(f);
   
-  dt = 0.2 * fmin(dx/fabs(u),dy/fabs(u));
+  dt = 0.2 * fmin(dx/fabs(u),dy/fabs(v));
   printf("dt:%f\n", dt);
 
   do{
-    if(icnt%1 == 0){
+    if(icnt%2 == 0){
       output(f, t, data_fp);
       ocnt++;
     }
@@ -78,7 +78,7 @@ int main(){
 
     t += dt;
     icnt++;
-  } while (t < 2.0 + 1e-9);
+  } while (t < 3.0 + 1e-9);
 
   //写真の枚数を出力するで～
   printf("number of pictures:%d\n", ocnt);
@@ -107,13 +107,29 @@ void initial(vvd &f){
           f[jy][jx] = 0.0;
         }
       }
-    }  
+    }
   }
   if(INITIAL == 1){
     //全部の点の10%くらいをランダムに選んで大きい値を持たせる
     for(int i = 0; i < nx*ny*0.8; i++) {
       f[rand()%ny][rand()%nx] = 1.0;
     }
+  }
+
+  if(INITIAL == 2){
+    for(int jy = 0; jy < ny; jy++) {
+      for(int jx = 0; jx < nx; jx++) {
+        if(0.3*nx < jx && jx < 0.7*nx && 0.3*ny < jy && jy < 0.7*ny){
+          f[jy][jx] = 1e5;
+        }
+        // else if(0.8*nx < jx && jx < 0.9*nx && 0.8*ny < jy && jy < 0.9*ny){
+        //   f[jy][jx] = 5.0;
+        // }
+        else{
+          f[jy][jx] = 1.0;
+        }
+      }
+    }  
   }
   
   //check用
@@ -203,10 +219,10 @@ void advection_upwind(vvd &f, vvd &fn, double u, double v, double dt){
       else
         fn[jy][jx] += -cflx*(f[jy][jx+1] - f[jy][jx]);
 
-      if (u > 0.0)
-        fn[jy][jx] += -cflx*(f[jy][jx] - f[jy-1][jx]);
+      if (v > 0.0)
+        fn[jy][jx] += -cfly*(f[jy][jx] - f[jy-1][jx]);
       else
-        fn[jy][jx] += -cflx*(f[jy+1][jx] - f[jy][jx]);
+        fn[jy][jx] += -cfly*(f[jy+1][jx] - f[jy][jx]);
     }
   }
 }

@@ -9,13 +9,13 @@ from IPython.display import HTML
 ###################### CONFIG ##################
 # 動画保存方法の config。 使いたい保存方法を１にする
 MP4       = 0
-GIF       = 1
+GIF       = 0
 HTML_SHOW = 0
-PLT       = 0
+PLT       = 1
 ###################### CONFIG ##################
 
 ################### PARAMETER ##################
-TITLE = '2D advection (central difference)'
+TITLE = '2D advection (upwind)'
 
 picnum_file = open('data/picture_number.txt')
 FRAMES = int(picnum_file.readline())
