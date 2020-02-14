@@ -5,6 +5,10 @@
 #include <vector>
 #include <random>
 
+using vd = std::vector<double>;
+using vvd = std::vector<vd>;
+
+
 /******************************CONFIG******************************/
 // 0:square 1:random 2:point 3:sin
 #define INITIAL 3
@@ -16,8 +20,6 @@
 #define TERMINAL 0
 /*******************************************************************/
 
-using vd = std::vector<double>;
-using vvd = std::vector<vd>;
 
 /******************************計算条件******************************/
 const int nx = 100+4;
@@ -27,7 +29,7 @@ const double Ly = 1.0;
 const double dx = Lx/double(nx-4);
 const double dy = Ly/double(ny-4);
 
-const double kappa = 0.01;
+const double Re = 200.0;
 //計算の安定性を決めるファクターμ, mu > 0.25 だと計算が爆発する
 const double mu = 0.20;
 /*******************************************************************/
@@ -39,75 +41,99 @@ TIME に(0, DT, 2DT, ..., endtime) をsetする
 */
 const double EPS = 1e-10;
 const double DT = 0.01;
-const double ENDTIME = 2.0;
+const double ENDTIME = 3.0;
 vd TIME;
 //出力時刻をset
 void TIME_set();
 /*************************************************************************/
 
+/************************************関数************************************/
 //初期状態を決定
-void initial(vvd &f);
+void initial(vvd &u, vvd &v);
 //その時刻における f[jy][jx] の値をファイルとターミナルにアウトプット
 void output(vvd &f, double t, FILE *data_fp);
-//f[jy][jx] をもとにワンタイムステップ後の状態 fn[jy][jx] を計算。
-//fn は fn[0][jx] など（つまり境界）は更新されないことに注意
-void diffusion(vvd &f, vvd &fn, double dt);
 //fn に境界条件を課す
 void boundary(vvd &fn);
 
-void x_advection(vvd &f, vvd &fn, double u, double dt);
-void y_advection(vvd &f, vvd &fn, double v, double dt);
+void diffusion(vvd &f, vvd &fn, double dt);
+void x_advection(vvd &f, vvd &fn, vvd &u, double dt);
+void y_advection(vvd &f, vvd &fn, vvd &v, double dt);
+void rotation(vvd &u, vvd &v, vvd &rot);
+void divergence(vvd &u, vvd &v, vvd &div);
+
+/****************************************************************************/
+
+/**************************ファイル**************************/
+FILE *condition_fp = fopen("data/condition.txt","w");
+FILE *u_fp = fopen("data/u.txt", "w");
+FILE *v_fp = fopen("data/v.txt", "w");
+FILE *div_fp = fopen("data/div.txt", "w");
+FILE *rot_fp = fopen("data/rot.txt", "w");
+
+/***********************************************************/
 
 int main(){
-  double dt, t = 0.0, u = 1.0, v = 1.0;
-  int ti = 0; //写真の枚数を数える
+  double dt, t = 0.0;
+  int ti = 0; //TIMEのindex
   
-  vvd f(ny,vd(nx, 0.0)), fn(ny, vd(nx, 0.0));
-  FILE *data_fp, *picnum_fp;//二つ目は写真の枚数を出力するファイル
+  vvd u(ny,vd(nx, 0.0)), un(ny, vd(nx, 0.0));
+  vvd v(ny,vd(nx, 0.0)), vn(ny, vd(nx, 0.0));
+  vvd rot(ny,vd(nx, 0.0)), div(ny, vd(nx, 0.0));
+
   clock_t start_t, end_t;
   start_t = time(NULL);
 
   // ランダム変数のシードは時刻から取る、つまり毎回違うシード
   srand((unsigned)time(NULL));
 
-  data_fp = fopen("data/profile.txt", "w");
-  picnum_fp = fopen("data/picture_number.txt", "w");
-  //printf("NX:%d NY:%d\nk:%f mu:%f\n", nx, ny, kappa, mu);
-  fprintf(data_fp,"%d %d\n%f %f %f %f\n", nx-4, ny-4, Lx, Ly, kappa, mu);
 
-  initial(f);
-  boundary(f);
+  initial(u, v);
+  boundary(u); boundary(v);
   TIME_set();
+
+  dt = fmin(0.2*fmin(dx,dy)/1.0, mu*fmin(dx*dx, dy*dy)*Re);
   
-  dt = fmin(0.2*fmin(dx/fabs(u),dy/fabs(v)), mu*fmin(dx*dx, dy*dy)/kappa);
+  printf("NX:%d NY:%d\nRe:%f mu:%f\n", nx, ny, Re, mu);
   printf("dt:%.10f\n", dt);
+  
+  fprintf(condition_fp, "%d %d %d\n%f %f %f %f\n", nx-4, ny-4, TIME.size(), Lx, Ly, Re, mu);
+  fclose(condition_fp);
 
   do{
     if(ti < TIME.size() && t > TIME[ti] - EPS){
-      output(f, t, data_fp);
+      divergence(u, v, div);
+      rotation(u, v, rot);
+      output(u, t, u_fp);
+      output(v, t, v_fp);
+      output(div, t, div_fp);
+      output(rot, t, rot_fp);
       ti++;
     }
-    x_advection(f, fn, u, dt);
-    boundary(fn);
-    f = fn;
 
-    y_advection(f, fn, v, dt);
-    boundary(fn);
-    f = fn;
+    x_advection(u, un, u, dt);
+    x_advection(v, vn, u, dt);
+    boundary(un); boundary(vn);
+    u = un; v = vn;
 
-    diffusion(f, fn, dt);
-    boundary(fn);
-    f = fn;
+    y_advection(u, un, v, dt);
+    y_advection(v, vn, v, dt);
+    boundary(un); boundary(vn);
+    u = un; v = vn;
+
+    diffusion(u, un, dt);
+    diffusion(v, vn, dt);
+    boundary(un); boundary(vn);
+    u = un; v = vn;
 
     t += dt;
   } while (t < ENDTIME + DT);
 
-  //写真の枚数を出力するで～
   printf("number of pictures:%d\n", int(TIME.size()));
-  fprintf(picnum_fp,"%d", int(TIME.size()));
 
-  fclose(picnum_fp);
-  fclose(data_fp);
+  fclose(u_fp);
+  fclose(v_fp);
+  fclose(div_fp);
+  fclose(rot_fp);
 
   end_t = time(NULL);
   printf("This calculatioin took %ld second \n", end_t - start_t);
@@ -115,43 +141,27 @@ int main(){
   return 0;
 }
 
-void initial(vvd &f){
+void initial(vvd &u, vvd &v){
   if(INITIAL == 0){
     for(int jy = 0; jy < ny; jy++) {
       for(int jx = 0; jx < nx; jx++) {
         if(0.3*nx < jx && jx < 0.7*nx && 0.3*ny < jy && jy < 0.7*ny){
-          f[jy][jx] = 1.0;
-        }
-        // else if(0.8*nx < jx && jx < 0.9*nx && 0.8*ny < jy && jy < 0.9*ny){
-        //   f[jy][jx] = 5.0;
-        // }
-        else{
-          f[jy][jx] = 0.0;
+          u[jy][jx] = 1.0;
+          v[jy][jx] = -1.0;
         }
       }
     }
   }
   if(INITIAL == 1){
-    //全部の点の10%くらいをランダムに選んで大きい値を持たせる
-    for(int i = 0; i < nx*ny*0.8; i++) {
-      f[rand()%ny][rand()%nx] = 1.0;
+    //全部の点の50%くらいをランダムに選んで大きい値を持たせる
+    for(int i = 0; i < nx*ny*0.5; i++) {
+      u[rand()%ny][rand()%nx] = 1.0;
+      v[rand()%ny][rand()%nx] = 1.0;
     }
   }
 
   if(INITIAL == 2){
-    for(int jy = 0; jy < ny; jy++) {
-      for(int jx = 0; jx < nx; jx++) {
-        if(0.3*nx < jx && jx < 0.7*nx && 0.3*ny < jy && jy < 0.7*ny){
-          f[jy][jx] = 1e5;
-        }
-        // else if(0.8*nx < jx && jx < 0.9*nx && 0.8*ny < jy && jy < 0.9*ny){
-        //   f[jy][jx] = 5.0;
-        // }
-        else{
-          f[jy][jx] = 1.0;
-        }
-      }
-    }
+    u[ny/2][nx/2] = 1.0;
   }
   if(INITIAL == 3){
     double x, y, kx = 2.0*M_PI, ky = 2.0*M_PI;
@@ -159,7 +169,14 @@ void initial(vvd &f){
       for(int jx = 0; jx < nx; jx++) {
         x = dx*(double)(jx-2);
         y = dy*(double)(jy-2);
-        f[jy][jx] = sin(kx*x)*sin(ky*y);
+
+        u[jy][jx] = -cos(kx*x)*sin(ky*y)/kx;
+        v[jy][jx] = sin(kx*x)*cos(ky*y)/ky;
+        /*
+        x += 0.3; y+= 0.7;
+        u[jy][jx] = -0.6*cos(2.0*kx*x)*sin(2.0*ky*y)/kx;
+        v[jy][jx] = 0.6*sin(2.0*kx*x)*cos(2.0*ky*y)/ky;
+        */
       }
     }
   }
@@ -200,13 +217,13 @@ void output(vvd &f, double t, FILE *data_fp){
 }
 
 void diffusion(vvd &f, vvd &fn, double dt){
-  //境界条件は更新しない
+  //境界は更新しない
   for(int jy = 2; jy < ny-2; jy++) {
     for(int jx = 2; jx < nx-2; jx++) {
-      fn[jy][jx] = f[jy][jx] + kappa * dt * 
+      fn[jy][jx] = f[jy][jx] + dt * 
       ( (f[jy][jx+1] - 2.0*f[jy][jx] + f[jy][jx-1])/dx/dx
          + (f[jy+1][jx] - 2.0*f[jy][jx] + f[jy-1][jx])/dy/dy
-      );
+      )/Re;
     }
   }
   return;
@@ -245,13 +262,13 @@ void boundary(vvd &fn){
   return;
 }
 
-void x_advection(vvd &f, vvd &fn, double u, double dt){
+void x_advection(vvd &f, vvd &fn, vvd &u, double dt){
 
   double a,b,c,z;
 
   for (int jy = 2; jy < ny - 2; jy++){
     for (int jx = 2; jx < nx - 2; jx++){
-      if (u > 0.0){
+      if (u[jy][jx] > 0.0){
         a = (f[jy][jx+1] - 3.0*f[jy][jx] + 3.0*f[jy][jx-1] - f[jy][jx-2]) / (6.0*dx*dx*dx);
         b = (f[jy][jx+1] - 2.0*f[jy][jx] + f[jy][jx-1]) / (2.0*dx*dx);
         c = (2.0*f[jy][jx+1] + 3.0*f[jy][jx] - 6.0*f[jy][jx-1] + f[jy][jx-2]) / (6.0*dx);
@@ -261,19 +278,19 @@ void x_advection(vvd &f, vvd &fn, double u, double dt){
         b = (f[jy][jx+1] - 2.0*f[jy][jx] + f[jy][jx-1]) / (2.0*dx*dx);
         c = (-f[jy][jx+2] + 6.0*f[jy][jx+1] - 3.0*f[jy][jx] - 2.0*f[jy][jx-1]) / (6.0*dx);
       }
-      z = -u*dt;
+      z = -u[jy][jx]*dt;
       fn[jy][jx] = a*z*z*z + b*z*z + c*z + f[jy][jx];
     }
   }
 }
 
-void y_advection(vvd &f, vvd &fn, double v, double dt){
+void y_advection(vvd &f, vvd &fn, vvd &v, double dt){
 
   double a,b,c,z;
 
   for (int jy = 2; jy < ny - 2; jy++){
     for (int jx = 2; jx < nx - 2; jx++){
-      if (v > 0.0){
+      if (v[jy][jx] > 0.0){
         a = (f[jy+1][jx] - 3.0*f[jy][jx] + 3.0*f[jy-1][jx] - f[jy-2][jx]) / (6.0*dy*dy*dy);
         b = (f[jy+1][jx] - 2.0*f[jy][jx] + f[jy-1][jx]) / (2.0*dy*dy);
         c = (2.0*f[jy+1][jx]+ 3.0*f[jy][jx] - 6.0*f[jy-1][jx] + f[jy-2][jx]) / (6.0*dy);
@@ -283,7 +300,7 @@ void y_advection(vvd &f, vvd &fn, double v, double dt){
         b = (f[jy+1][jx] - 2.0*f[jy][jx] + f[jy-1][jx]) / (2.0*dy*dy);
         c = (-f[jy+2][jx] + 6.0*f[jy+1][jx] - 3.0*f[jy][jx] - 2.0*f[jy-1][jx]) / (6.0*dy);
       }
-      z = -v*dt;
+      z = -v[jy][jx]*dt;
       fn[jy][jx] = a*z*z*z + b*z*z + c*z + f[jy][jx];
     }
   }
@@ -294,5 +311,23 @@ void TIME_set(){
   while(tmp < ENDTIME + EPS){
     TIME.push_back(tmp);
     tmp += DT;
+  }
+}
+
+void rotation(vvd &u, vvd &v, vvd &rot){
+  for(int jy = 2; jy < ny-2; jy++) {
+    for(int jx = 2; jx < nx-2; jx++) {
+      rot[jy][jx] = 0.5*(v[jy+1][jx+1] - v[jy+1][jx]+ v[jy][jx+1] - v[jy][jx])/dx
+                  - 0.5*(u[jy+1][jx+1] - u[jy][jx+1] + u[jy+1][jx] - u[jy][jx])/dy;
+    }
+  }
+}
+
+void divergence(vvd &u, vvd &v, vvd &div){
+  for (int jy = 2; jy < ny - 2; jy++){
+    for (int jx = 2; jx < nx - 2; jx++){
+      div[jy][jx] = 0.5*(u[jy+1][jx+1] - u[jy+1][jx] + u[jy][jx+1] - u[jy][jx])/dx
+                  + 0.5*(v[jy+1][jx+1] - v[jy][jx+1] + v[jy+1][jx] - v[jy][jx])/dy;
+    }
   }
 }

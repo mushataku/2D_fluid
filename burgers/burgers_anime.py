@@ -1,4 +1,4 @@
-#最終更新： 2020/2/14 15:40
+#最終更新： 2020/2/14 19:40
 
 import numpy as np
 import matplotlib 
@@ -9,22 +9,22 @@ from IPython.display import HTML
 ###################### CONFIG ##################
 # 動画保存方法の config, 使いたい保存方法を１にする
 MP4       = 0
-GIF       = 1
+GIF       = 0
 HTML_SHOW = 0
-PLT       = 0
+PLT       = 1
 ###################### CONFIG ##################
 
 ################### PARAMETER ##################
 TITLE = '2D burgers'
 
-picnum_file = open('data/picture_number.txt')
-FRAMES = int(picnum_file.readline())
+cfp = open('data/condition.txt')
 
-f = open('data/profile.txt')
-NX, NY = map(int, f.readline().split())
-Lx, Ly, kappa, mu = map(float, f.readline().split())
+NX, NY ,FRAMES= map(int, cfp.readline().split())
+Lx, Ly, Re, mu = map(float, cfp.readline().split())
+cfp.close
 ################### PARAMETER ##################
 
+f = open('data/div.txt')
 
 fig = plt.figure(figsize=(6, 6))
 fig.subplots_adjust(left=0.20)
@@ -35,7 +35,7 @@ ax.set_xlabel('X', fontsize=16)
 ax.set_ylabel('y', fontsize=16)
 ax.tick_params(labelsize=14)
 ax.set_title(TITLE, fontsize=20)
-ax.text(0.02, 0.02, r"$\mu$="+str(mu)+"\n"+r"$\kappa$="+str(kappa), horizontalalignment='left',
+ax.text(0.02, 0.02, r"$\mu$="+str(mu)+"\n"+r"Re="+str(Re), horizontalalignment='left',
         verticalalignment='bottom',
           size=20, color="white", backgroundcolor='black', transform = ax.transAxes)
 
@@ -95,4 +95,3 @@ if(PLT == 1):
   plt.show()
 
 f.close
-picnum_file.close
