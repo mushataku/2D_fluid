@@ -83,10 +83,10 @@ ani = FuncAnimation(fig, update, repeat=True, interval=20, frames=FRAMES)
 
 # mp4 ファイルとして保存
 if(MP4 == 1):
-  ani.save("animes/adv_anime.mp4", writer="ffmpeg")
+  ani.save("animes/adv_upwind_anime.mp4", writer="ffmpeg")
 # gif ファイルとして保存
 if(GIF == 1):
-  ani.save("animes/adv_anime.gif", writer="pillow")
+  ani.save("animes/adv_upwind_anime.gif", writer="pillow")
 # HTML上で表示
 if(HTML_SHOW == 1):
   HTML(ani.to_jshtml())

@@ -1,4 +1,4 @@
-#最終更新： 2020/2/13 16:50
+#最終更新： 2020/2/14 15:40
 
 import numpy as np
 import matplotlib 
@@ -15,32 +15,33 @@ PLT       = 1
 ###################### CONFIG ##################
 
 ################### PARAMETER ##################
-TITLE = '2D advection (upwind)'
+TITLE = '2D advection (cubic)'
 
 picnum_file = open('data/picture_number.txt')
 FRAMES = int(picnum_file.readline())
 
-f = open('data/advection_upwind.txt')
+f = open('data/advection_cubic.txt')
 NX, NY = map(int, f.readline().split())
-kappa, mu = map(float, f.readline().split())
+Lx, Ly, kappa, mu = map(float, f.readline().split())
 ################### PARAMETER ##################
 
 
 fig = plt.figure(figsize=(6, 6))
 fig.subplots_adjust(left=0.20)
 ax = fig.add_subplot(111)
-ax.set_xlim(0, NX-1)
-ax.set_ylim(0, NY-1)
+#ax.set_xlim(0, NX-1)
+#ax.set_ylim(0, NY-1)
 ax.set_xlabel('X', fontsize=16)
 ax.set_ylabel('y', fontsize=16)
 ax.tick_params(labelsize=14)
 ax.set_title(TITLE, fontsize=20)
-ax.text(0.02, 0.035, r"$\mu$="+str(mu)+"\n"+r"$\kappa$="+str(kappa),
+ax.text(0.02, 0.02, r"$\mu$="+str(mu)+"\n"+r"$\kappa$="+str(kappa), horizontalalignment='left',
+        verticalalignment='bottom',
           size=20, color="white", backgroundcolor='black', transform = ax.transAxes)
 
 
-time_text = ax.text(0.02, 0.91, '', size=20, color="white",
-          backgroundcolor='black', transform=ax.transAxes)
+time_text = ax.text(0.02, 0.98, '', size=20, color="white", horizontalalignment='left',
+            verticalalignment='top', backgroundcolor='black', transform=ax.transAxes)
 
 
 ################### アニメの初期画像 ###################
@@ -52,7 +53,7 @@ for _ in range(NY):
   tmp = list(map(float, f.readline().split()))
   data.append(tmp)
 
-im = ax.imshow(data, animated=True, cmap='jet')
+im = ax.imshow(data, extent=(0,Lx,0,Ly), origin="lower", animated=True, cmap='jet')
 cbar = fig.colorbar(im, shrink=0.7)
 cbar.ax.tick_params(labelsize=16)
 ######################################################
@@ -83,10 +84,10 @@ ani = FuncAnimation(fig, update, repeat=True, interval=20, frames=FRAMES)
 
 # mp4 ファイルとして保存
 if(MP4 == 1):
-  ani.save("animes/adv_anime.mp4", writer="ffmpeg")
+  ani.save("animes/adv_cubic_anime.mp4", writer="ffmpeg")
 # gif ファイルとして保存
 if(GIF == 1):
-  ani.save("animes/adv_anime.gif", writer="pillow")
+  ani.save("animes/adv_cubic_anime.gif", writer="pillow")
 # HTML上で表示
 if(HTML_SHOW == 1):
   HTML(ani.to_jshtml())

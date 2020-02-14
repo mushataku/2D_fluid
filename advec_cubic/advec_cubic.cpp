@@ -1,11 +1,12 @@
+#define _USE_MATH_DEFINES
 #include <cstdio>
 #include <cmath>
 #include <time.h>
 #include <vector>
 #include <random>
 
-// 0:fixed 1:random 2:point
-#define INITIAL 0
+// 0:fixed 1:random 2:point 3:sin
+#define INITIAL 3
 // 0:fixed 1:periodic
 #define BOUNDARY 1
 // 0:upwind 1:central difference
@@ -15,12 +16,12 @@ using vd = std::vector<double>;
 using vvd = std::vector<vd>;
 
 /******************************計算条件******************************/
-const int nx = 20+3;
-const int ny = 20+3;
+const int nx = 100+4;
+const int ny = 100+4;
 const double Lx = 1.0;
 const double Ly = 1.0;
-const double dx = Lx/double(nx-3);
-const double dy = Ly/double(ny-3);
+const double dx = Lx/double(nx-4);
+const double dy = Ly/double(ny-4);
 
 const double kappa = 1.0;
 //計算の安定性を決めるファクターμ, mu > 0.25 だと計算が爆発する
@@ -38,8 +39,8 @@ void diffusion(vvd &f, vvd &fn, double dt);
 //fn に境界条件を課す
 void boundary(vvd &fn);
 
-void advection_upwind(vvd &f, vvd &fn, double u, double v, double dt);
-void advection_central(vvd &f, vvd &fn, double u, double v, double dt);
+void x_advection(vvd &f, vvd &fn, double u, double dt);
+void y_advection(vvd &f, vvd &fn, double v, double dt);
 
 int main(){
   double dt, t = 0.0, u = 1.0, v = 1.0;
@@ -52,10 +53,10 @@ int main(){
   // ランダム変数のシードは時刻から取る、つまり毎回違うシード
   srand((unsigned)time(NULL));
 
-  data_fp = fopen("data/advection_upwind.txt", "w");
+  data_fp = fopen("data/advection_cubic.txt", "w");
   picnum_fp = fopen("data/picture_number.txt", "w");
   //printf("NX:%d NY:%d\nk:%f mu:%f\n", nx, ny, kappa, mu);
-  fprintf(data_fp,"%d %d\n%f %f\n", nx-2, ny-2, kappa, mu);
+  fprintf(data_fp,"%d %d\n%f %f %f %f\n", nx-4, ny-4, Lx, Ly, kappa, mu);
 
   initial(f);
   boundary(f);
@@ -68,17 +69,17 @@ int main(){
       output(f, t, data_fp);
       ocnt++;
     }
-    if(METHOD == 0)
-      advection_upwind(f, fn, u, v, dt);
-    if(METHOD == 1)
-      advection_central(f, fn, u, v, dt);
+    x_advection(f, fn, u, dt);
     boundary(fn);
+    f = fn;
 
+    y_advection(f, fn, v, dt);
+    boundary(fn);
     f = fn;
 
     t += dt;
     icnt++;
-  } while (t < 3.0 + 1e-9);
+  } while (t < 2.0 + 1e-9);
 
   //写真の枚数を出力するで～
   printf("number of pictures:%d\n", ocnt);
@@ -129,7 +130,17 @@ void initial(vvd &f){
           f[jy][jx] = 1.0;
         }
       }
-    }  
+    }
+  }
+  if(INITIAL == 3){
+    double x, y, kx = 2.0*M_PI, ky = 2.0*M_PI;
+    for(int jy = 0; jy < ny; jy++) {
+      for(int jx = 0; jx < nx; jx++) {
+        x = dx*(double)(jx-2);
+        y = dy*(double)(jy-2);
+        f[jy][jx] = sin(kx*x)*sin(ky*y);
+      }
+    }
   }
   
   //check用
@@ -143,6 +154,7 @@ void initial(vvd &f){
   //     }
   //   }
   // }
+
   return;
 }
 
@@ -151,9 +163,9 @@ void output(vvd &f, double t, FILE *data_fp){
   fprintf(data_fp,"%f\n", t);
 
   //端っこの境界条件のためのダミーの格子点は出力しない
-  for(int jy = 1; jy < ny-1; jy++) {
-    for(int jx = 1; jx < nx-1; jx++) {
-      if(jx < nx-2){
+  for(int jy = 2; jy < ny-2; jy++) {
+    for(int jx = 2; jx < nx-2; jx++) {
+      if(jx < nx-3){
         //printf("%.2f ", f[jy][jx]);
         fprintf(data_fp, "%f ", f[jy][jx]);
       }
@@ -186,10 +198,15 @@ void boundary(vvd &fn){
     for(int jx=0 ; jx < nx; jx++) fn[ny-1][jx] = 0.0;
   }
   if(BOUNDARY == 1){
-    for(int jy=0 ; jy < ny; jy++) fn[jy][0] = fn[jy][nx-2];
-    for(int jy=0 ; jy < ny; jy++) fn[jy][nx-1] = fn[jy][1];
-    for(int jx=0 ; jx < nx; jx++) fn[0][jx] = fn[ny-2][jx];
-    for(int jx=0 ; jx < nx; jx++) fn[ny-1][jx] = fn[1][jx];    
+    for(int jy=0 ; jy < ny; jy++) fn[jy][nx-1] = fn[jy][3];
+    for(int jy=0 ; jy < ny; jy++) fn[jy][nx-2] = fn[jy][2];
+    for(int jy=0 ; jy < ny; jy++) fn[jy][1] = fn[jy][nx-3];
+    for(int jy=0 ; jy < ny; jy++) fn[jy][0] = fn[jy][nx-4];
+
+    for(int jx=0 ; jx < nx; jx++) fn[ny-1][jx] = fn[3][jx];
+    for(int jx=0 ; jx < nx; jx++) fn[ny-2][jx] = fn[2][jx];
+    for(int jx=0 ; jx < nx; jx++) fn[1][jx] = fn[ny-3][jx];
+    for(int jx=0 ; jx < nx; jx++) fn[0][jx] = fn[ny-4][jx];
   }
   //check 用
   // printf("boundary chech\n");
@@ -206,37 +223,46 @@ void boundary(vvd &fn){
   return;
 }
 
-void advection_upwind(vvd &f, vvd &fn, double u, double v, double dt){
+void x_advection(vvd &f, vvd &fn, double u, double dt){
 
-  double cflx = u*dt/dx, cfly = v*dt/dy;
+  double a,b,c,z;
 
-  for(int jy = 1; jy < ny-1; jy++) {
-    for(int jx = 1; jx < nx-1; jx++) {
-      fn[jy][jx] = f[jy][jx];
-
-      if(u > 0.0)
-        fn[jy][jx] += -cflx*(f[jy][jx] - f[jy][jx-1]);
-      else
-        fn[jy][jx] += -cflx*(f[jy][jx+1] - f[jy][jx]);
-
-      if (v > 0.0)
-        fn[jy][jx] += -cfly*(f[jy][jx] - f[jy-1][jx]);
-      else
-        fn[jy][jx] += -cfly*(f[jy+1][jx] - f[jy][jx]);
+  for (int jy = 2; jy < ny - 2; jy++){
+    for (int jx = 2; jx < nx - 2; jx++){
+      if (u > 0.0){
+        a = (f[jy][jx+1] - 3.0*f[jy][jx] + 3.0*f[jy][jx-1] - f[jy][jx-2]) / (6.0*dx*dx*dx);
+        b = (f[jy][jx+1] - 2.0*f[jy][jx] + f[jy][jx-1]) / (2.0*dx*dx);
+        c = (2.0*f[jy][jx+1] + 3.0*f[jy][jx] - 6.0*f[jy][jx-1] + f[jy][jx-2]) / (6.0*dx);
+      }
+      else{
+        a = (f[jy][jx+2] - 3.0*f[jy][jx+1] + 3.0*f[jy][jx] - f[jy][jx-1]) / (6.0*dx*dx*dx);
+        b = (f[jy][jx+1] - 2.0*f[jy][jx] + f[jy][jx-1]) / (2.0*dx*dx);
+        c = (-f[jy][jx+2] + 6.0*f[jy][jx+1] - 3.0*f[jy][jx] - 2.0*f[jy][jx-1]) / (6.0*dx);
+      }
+      z = -u*dt;
+      fn[jy][jx] = a*z*z*z + b*z*z + c*z + f[jy][jx];
     }
   }
 }
 
-void advection_central(vvd &f, vvd &fn, double u, double v, double dt){
+void y_advection(vvd &f, vvd &fn, double v, double dt){
 
-  double cflx = u*dt/dx, cfly = v*dt/dy;
+  double a,b,c,z;
 
-  for(int jy = 1; jy < ny-1; jy++) {
-    for(int jx = 1; jx < nx-1; jx++) {
-      fn[jy][jx] = f[jy][jx];
-
-      fn[jy][jx] += -0.5*cflx*(f[jy][jx+1] - f[jy][jx-1]);
-      fn[jy][jx] += -0.5*cfly*(f[jy+1][jx] - f[jy-1][jx]);
+  for (int jy = 2; jy < ny - 2; jy++){
+    for (int jx = 2; jx < nx - 2; jx++){
+      if (v > 0.0){
+        a = (f[jy+1][jx] - 3.0*f[jy][jx] + 3.0*f[jy-1][jx] - f[jy-2][jx]) / (6.0*dy*dy*dy);
+        b = (f[jy+1][jx] - 2.0*f[jy][jx] + f[jy-1][jx]) / (2.0*dy*dy);
+        c = (2.0*f[jy+1][jx]+ 3.0*f[jy][jx] - 6.0*f[jy-1][jx] + f[jy-2][jx]) / (6.0*dy);
+      }
+      else{
+        a = (f[jy+2][jx] - 3.0*f[jy+1][jx] + 3.0*f[jy][jx] - f[jy-1][jx]) / (6.0*dy*dy*dy);
+        b = (f[jy+1][jx] - 2.0*f[jy][jx] + f[jy-1][jx]) / (2.0*dy*dy);
+        c = (-f[jy+2][jx] + 6.0*f[jy+1][jx] - 3.0*f[jy][jx] - 2.0*f[jy-1][jx]) / (6.0*dy);
+      }
+      z = -v*dt;
+      fn[jy][jx] = a*z*z*z + b*z*z + c*z + f[jy][jx];
     }
   }
 }
