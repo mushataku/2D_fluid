@@ -11,7 +11,7 @@ using vvd = std::vector<vd>;
 
 /******************************CONFIG******************************/
 // 0:square 1:random 2:point 3:sin
-#define INITIAL 3
+#define INITIAL 0
 // 0:fixed 1:periodic
 #define BOUNDARY 1
 // 0:upwind 1:central difference
@@ -29,7 +29,7 @@ const double Ly = 1.0;
 const double dx = Lx/double(nx-4);
 const double dy = Ly/double(ny-4);
 
-const double Re = 200.0;
+const double Re = 2000.0;
 //計算の安定性を決めるファクターμ, mu > 0.25 だと計算が爆発する
 const double mu = 0.20;
 /*******************************************************************/
@@ -40,7 +40,7 @@ const double mu = 0.20;
 TIME に(0, DT, 2DT, ..., endtime) をsetする
 */
 const double EPS = 1e-10;
-const double DT = 0.01;
+const double DT = 0.02;
 const double ENDTIME = 3.0;
 vd TIME;
 //出力時刻をset
@@ -74,7 +74,7 @@ FILE *rot_fp = fopen("data/rot.txt", "w");
 
 int main(){
   double dt, t = 0.0;
-  int ti = 0; //TIMEのindex
+  int ti = 0, icnt = 0; //TIMEのindex
   
   vvd u(ny,vd(nx, 0.0)), un(ny, vd(nx, 0.0));
   vvd v(ny,vd(nx, 0.0)), vn(ny, vd(nx, 0.0));
@@ -96,8 +96,6 @@ int main(){
   printf("NX:%d NY:%d\nRe:%f mu:%f\n", nx, ny, Re, mu);
   printf("dt:%.10f\n", dt);
   
-  fprintf(condition_fp, "%d %d %d\n%f %f %f %f\n", nx-4, ny-4, TIME.size(), Lx, Ly, Re, mu);
-  fclose(condition_fp);
 
   do{
     if(ti < TIME.size() && t > TIME[ti] - EPS){
@@ -107,7 +105,7 @@ int main(){
       output(v, t, v_fp);
       output(div, t, div_fp);
       output(rot, t, rot_fp);
-      ti++;
+      ti++; icnt++;
     }
 
     x_advection(u, un, u, dt);
@@ -128,8 +126,10 @@ int main(){
     t += dt;
   } while (t < ENDTIME + DT);
 
-  printf("number of pictures:%d\n", int(TIME.size()));
+  printf("number of pictures:%d\n", icnt);
+  fprintf(condition_fp, "%d %d %d\n%f %f %f %f\n", nx-4, ny-4, icnt, Lx, Ly, Re, mu);
 
+  fclose(condition_fp);
   fclose(u_fp);
   fclose(v_fp);
   fclose(div_fp);
@@ -147,7 +147,7 @@ void initial(vvd &u, vvd &v){
       for(int jx = 0; jx < nx; jx++) {
         if(0.3*nx < jx && jx < 0.7*nx && 0.3*ny < jy && jy < 0.7*ny){
           u[jy][jx] = 1.0;
-          v[jy][jx] = -1.0;
+          v[jy][jx] = 1.0;
         }
       }
     }
@@ -172,11 +172,11 @@ void initial(vvd &u, vvd &v){
 
         u[jy][jx] = -cos(kx*x)*sin(ky*y)/kx;
         v[jy][jx] = sin(kx*x)*cos(ky*y)/ky;
-        /*
+        
         x += 0.3; y+= 0.7;
         u[jy][jx] = -0.6*cos(2.0*kx*x)*sin(2.0*ky*y)/kx;
         v[jy][jx] = 0.6*sin(2.0*kx*x)*cos(2.0*ky*y)/ky;
-        */
+        
       }
     }
   }
