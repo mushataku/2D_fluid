@@ -11,7 +11,7 @@ using vvd = std::vector<vd>;
 
 /******************************CONFIG******************************/
 // 0:square 1:random 2:point 3:sin
-#define INITIAL 0
+#define INITIAL 3
 // 0:fixed 1:periodic
 #define BOUNDARY 1
 // 0:upwind 1:central difference
@@ -22,8 +22,8 @@ using vvd = std::vector<vd>;
 
 
 /******************************計算条件******************************/
-const int nx = 100+4;
-const int ny = 100+4;
+const int ny = 50+4;
+const int nx = 50+4;
 const double Lx = 1.0;
 const double Ly = 1.0;
 const double dx = Lx/double(nx-4);
@@ -127,7 +127,7 @@ int main(){
   } while (t < ENDTIME + DT);
 
   printf("number of pictures:%d\n", icnt);
-  fprintf(condition_fp, "%d %d %d\n%f %f %f %f\n", nx-4, ny-4, icnt, Lx, Ly, Re, mu);
+  fprintf(condition_fp, "%d %d %d\n%f %f %f %f\n", nx-3, ny-3, icnt, Lx, Ly, Re, mu);
 
   fclose(condition_fp);
   fclose(u_fp);
@@ -202,9 +202,9 @@ void output(vvd &f, double t, FILE *data_fp){
   fprintf(data_fp,"%f\n", t);
 
   //端っこの境界条件のためのダミーの格子点は出力しない
-  for(int jy = 2; jy < ny-2; jy++) {
-    for(int jx = 2; jx < nx-2; jx++) {
-      if(jx < nx-3){
+  for(int jy = 2; jy <= ny-2; jy++) {
+    for(int jx = 2; jx <= nx-2; jx++) {
+      if(jx < nx-2){
         if(TERMINAL == 1) printf("%.2f ", f[jy][jx]);
         fprintf(data_fp, "%f ", f[jy][jx]);
       }
