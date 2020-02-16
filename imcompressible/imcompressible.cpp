@@ -39,20 +39,37 @@ const double mu = 0.20;
 時刻 0 ~ endtime の間のプロファイルを時間 DT ごとに出力させるための変数達
 TIME に(0, DT, 2DT, ..., endtime) をsetする
 */
-const double EPS = 1e-10;
+const double T_EPS = 1.0e-10;
 const double DT = 0.02;
-const double ENDTIME = 3.0;
+const double ENDTIME = 5.0;
 vd TIME;
 //出力時刻をset
 void TIME_set();
 /*************************************************************************/
 
-/************************************関数************************************/
-//初期状態を決定
+/*************************poisson eq 関連の関数・定数*************************/
+// 仮の流速 u*, v* からpoisson 方程式の右辺 s を求める
+void get_s(vvd &u, vvd &v, vvd &s, double dt);
+// SOR法で1ステップだけf更新。誤差|f - fn|の最大値を返す
+double sor(vvd &f, vvd &s);
+// sor をたくさん呼び出して poisson 方程式を解く。返り値は反復回数
+int poisson2d(vvd &f, vvd &s);
+// 残差の最大値を計算。反復中に呼び出すことで精度の上昇を見れる。
+double residual(vvd &f, vvd &s);
+
+// 圧力から速度を補正
+void correction(vvd &u, vvd &v, vvd &p, double dt);
+
+const double omega = 1.8;
+const double P_EPS = 1.0e-5;
+/****************************************************************************/
+
+/******************************burgersを解く関数******************************/
+// 初期状態を決定
 void initial(vvd &u, vvd &v);
-//その時刻における f[jy][jx] の値をファイルとターミナルにアウトプット
+// その時刻における f[jy][jx] の値をファイルとターミナルにアウトプット
 void output(vvd &f, double t, FILE *data_fp);
-//fn に境界条件を課す
+// fn に境界条件を課す
 void boundary(vvd &fn);
 
 void diffusion(vvd &f, vvd &fn, double dt);
@@ -60,8 +77,8 @@ void x_advection(vvd &f, vvd &fn, vvd &u, double dt);
 void y_advection(vvd &f, vvd &fn, vvd &v, double dt);
 void rotation(vvd &u, vvd &v, vvd &rot);
 void divergence(vvd &u, vvd &v, vvd &div);
-
 /****************************************************************************/
+
 
 /**************************ファイル**************************/
 FILE *condition_fp = fopen("data/condition.txt","w");
@@ -69,16 +86,19 @@ FILE *u_fp = fopen("data/u.txt", "w");
 FILE *v_fp = fopen("data/v.txt", "w");
 FILE *div_fp = fopen("data/div.txt", "w");
 FILE *rot_fp = fopen("data/rot.txt", "w");
+FILE *p_fp = fopen("data/p.txt", "w");
 
 /***********************************************************/
 
 int main(){
   double dt, t = 0.0;
   int ti = 0, icnt = 0; //TIMEのindex
-  
+  int iteration;
+
   vvd u(ny,vd(nx, 0.0)), un(ny, vd(nx, 0.0));
   vvd v(ny,vd(nx, 0.0)), vn(ny, vd(nx, 0.0));
   vvd rot(ny,vd(nx, 0.0)), div(ny, vd(nx, 0.0));
+  vvd p(ny,vd(nx, 0.0)), s(ny, vd(nx, 0.0));
 
   clock_t start_t, end_t;
   start_t = time(NULL);
@@ -95,16 +115,20 @@ int main(){
   
   printf("NX:%d NY:%d\nRe:%f mu:%f\n", nx, ny, Re, mu);
   printf("dt:%.10f\n", dt);
-  
-
+  //ti = 3;
   do{
-    if(ti < TIME.size() && t > TIME[ti] - EPS){
+    if(ti < TIME.size() && t > TIME[ti] - T_EPS){
+      if(ti == 0){
+        get_s(u, v, s, dt);
+        poisson2d(p, s);
+      }
       divergence(u, v, div);
       rotation(u, v, rot);
       output(u, t, u_fp);
       output(v, t, v_fp);
       output(div, t, div_fp);
       output(rot, t, rot_fp);
+      output(p, t, p_fp);
       ti++; icnt++;
     }
 
@@ -123,6 +147,17 @@ int main(){
     boundary(un); boundary(vn);
     u = un; v = vn;
 
+    get_s(u, v, s, dt);
+    iteration = poisson2d(p, s);
+    if(iteration == -1){
+      printf("poisson does not converged in time = %f\n", t);
+      return 0;
+    }
+    correction(u, v, p, dt);
+    boundary(u); boundary(v);
+
+    printf("time:%f\n", t);
+
     t += dt;
   } while (t < ENDTIME + DT);
 
@@ -134,6 +169,7 @@ int main(){
   fclose(v_fp);
   fclose(div_fp);
   fclose(rot_fp);
+  fclose(p_fp);
 
   end_t = time(NULL);
   printf("This calculatioin took %ld second \n", end_t - start_t);
@@ -148,7 +184,11 @@ void initial(vvd &u, vvd &v){
         if(0.3*nx < jx && jx < 0.7*nx && 0.3*ny < jy && jy < 0.7*ny){
           u[jy][jx] = 1.0;
           v[jy][jx] = 1.0;
-        }
+        }/*
+        else{
+          u[jy][jx] = -1.0;
+          v[jy][jx] = 0.0;
+        }*/
       }
     }
   }
@@ -308,7 +348,7 @@ void y_advection(vvd &f, vvd &fn, vvd &v, double dt){
 
 void TIME_set(){
   double tmp = 0.0;
-  while(tmp < ENDTIME + EPS){
+  while(tmp < ENDTIME + T_EPS){
     TIME.push_back(tmp);
     tmp += DT;
   }
@@ -324,10 +364,75 @@ void rotation(vvd &u, vvd &v, vvd &rot){
 }
 
 void divergence(vvd &u, vvd &v, vvd &div){
-  for (int jy = 2; jy < ny - 2; jy++){
-    for (int jx = 2; jx < nx - 2; jx++){
+  for (int jy = 2; jy < ny-2; jy++){
+    for (int jx = 2; jx < nx-2; jx++){
       div[jy][jx] = 0.5*(u[jy+1][jx+1] - u[jy+1][jx] + u[jy][jx+1] - u[jy][jx])/dx
                   + 0.5*(v[jy+1][jx+1] - v[jy][jx+1] + v[jy+1][jx] - v[jy][jx])/dy;
+    }
+  }
+}
+
+void get_s(vvd &u, vvd &v, vvd &s, double dt){
+  for (int jy = 2; jy < ny-2; jy++){
+    for (int jx = 2; jx < nx-2; jx++){
+      s[jy][jx] = 0.5*(u[jy+1][jx+1] - u[jy+1][jx] + u[jy][jx+1] - u[jy][jx])/dx
+                  + 0.5*(v[jy+1][jx+1] - v[jy][jx+1] + v[jy+1][jx] - v[jy][jx])/dy;
+      s[jy][jx] /= dt;
+    }
+  }
+}
+
+double residual(vvd &f, vvd &s){
+  double res, rmax = 0.0;
+  //各格子点の(d^2f/dx^2 + d^2f/dy^2 - s)を計算
+  for (int jy = 1; jy < ny - 1; jy++){
+    for (int jx = 1; jx < nx - 1; jx++){
+      res = (f[jy][jx + 1] - 2.0 * f[jy][jx] + f[jy][jx - 1]) / (dx * dx) 
+          + (f[jy + 1][jx] - 2.0 * f[jy][jx] + f[jy - 1][jx]) / (dy * dy)
+          - s[jy][jx];
+      rmax = fmax(res, rmax);
+    }
+  }
+
+  return rmax;
+}
+
+double sor(vvd &f, vvd &s){
+  double fn, err = 0.0;
+  for (int jy = 1; jy < ny - 1; jy++){
+    for (int jx = 1; jx < nx - 1; jx++){
+      fn = ((f[jy][jx + 1] + f[jy][jx - 1]) / (dx * dx) 
+         + (f[jy + 1][jx] + f[jy - 1][jx]) / (dy * dy) - s[jy][jx]) 
+         * 0.5 * dx * dx * dy * dy / (dx * dx + dy * dy);
+      err = fmax(fabs(fn - f[jy][jx]), err);
+      f[jy][jx] = (1.0 - omega) * f[jy][jx] + omega * fn;
+    }
+  }
+
+  return err;
+}
+
+int poisson2d(vvd &f, vvd &s){
+  int icnt = 0, imax = 99999;
+  double err;
+
+  // 反復
+  while(icnt++ < imax){
+    //fの更新と更新前後の差の最大値確認
+    err = sor(f, s);
+    //更新してもほとんど変わらないようなら終了
+    if(P_EPS > err) return icnt;
+  }
+
+  // imax 回反復しても収束しないなら-1を返して終了
+  return -1;
+}
+
+void correction(vvd &u, vvd &v, vvd &p, double dt){
+  for (int j = 2; j < ny-2; j++){
+    for (int i = 2; i < nx-2; i++){
+      u[j][i] += -0.5*(p[j][i] - p[j][i-1] + p[j-1][i] - p[j-1][i-1])/dx*dt;
+      v[j][i] += -0.5*(p[j][i] - p[j-1][i] + p[j][i-1] - p[j-1][i-1])/dy*dt;
     }
   }
 }
