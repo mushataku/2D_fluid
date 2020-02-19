@@ -1,4 +1,14 @@
-#最終更新： 2020/2/15 16:00
+#最終更新： 2020/02/18
+'''
+[機能]
+・相対パス "./data/" の中にあるファイルから計算データを読み込みアニメーションを作成
+・20 行目あたりで好きな表示方法を選べる
+・MP4 と GIF の場合は相対パス "./animes/" の中にアニメーションを出力
+・P_DIV を 1 にすれば圧力と発散も表示できる
+
+[注意]
+・colorbar のスケールは 62 行目あたりの vmax で無理矢理合わせているから、初期条件によっては不適切なスケールになる
+'''
 
 import numpy as np
 import matplotlib 
@@ -22,17 +32,17 @@ P_DIV = 0
 ################### PARAMETER ##################
 TITLE = '2D Navier-Stokes equation'
 
-# quiver で描画するときに領域を何区間に分割するか（あんまり多いと見辛いので
-
-# NX-1. Ny-1 の約数じゃないと壊れる
-QNX = 20
-QNY = 20
 
 cfp = open('data/condition.txt')
 
 NX, NY, FRAMES = map(int, cfp.readline().split())
 Lx, Ly, Re, mu = map(float, cfp.readline().split())
 cfp.close
+
+# quiver で描画するときに領域を何区間に分割するか（あんまり多いと見辛いので
+# NX-1. Ny-1 の約数じゃないと壊れる
+QNX = 20
+QNY = 20 * int(Ly/Lx)
 ################### PARAMETER ##################
 
 ####################################描画のための関数####################################
@@ -49,12 +59,13 @@ def init_im(ax, f, title):
   ax.tick_params(labelsize=14)
   ax.set_title(title, fontsize=20)
   if(title == "divergence"):
-    MAX = 0.1
+    vmax = 0.1
   elif(title == "rotation"):
-    MAX = 20
+    vmax = 20
   elif(title == "pressure"):
-    MAX = 0.5
-  im = ax.imshow(data, extent=(0,Lx,0,Ly), origin="lower", animated=True, cmap='jet', norm=Normalize(vmin=-MAX, vmax=MAX))
+    vmax = 0.5
+  im = ax.imshow(data, extent=(0,Lx,0,Ly), origin="lower", animated=True, 
+                            cmap='jet', norm=Normalize(vmin=-vmax, vmax=vmax))
   divider = make_axes_locatable(ax)
   cax = divider.append_axes("right", size="5%", pad=0.05)
   cbar = fig.colorbar(im, cax=cax)
@@ -140,7 +151,7 @@ fig.text(0, 0.01, "Re="+str(Re),
           backgroundcolor="black",color="white", size=20)
 
 
-time_text = fig.text(0.02, 0.98, '', size=20, color="white", horizontalalignment='left',
+time_text = fig.text(0, 0.99, '', size=20, color="white", horizontalalignment='left',
             verticalalignment='top', backgroundcolor='black')
 
 ################### アニメの初期画像 ###################
@@ -165,7 +176,6 @@ def update(cnt):
     return
 
   print("cnt:",cnt)
-  ######################################################
 
   # 変更箇所だけreset
   quiver_reset(im_q)

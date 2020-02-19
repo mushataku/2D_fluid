@@ -1,3 +1,28 @@
+/* 最終更新：2020/02/18
+[機能]
+・2D Navier-Stokes 方程式を非圧縮条件のもとで Fractional Step 法で計算する。
+・50 行目あたりのパラメータをいじって計算条件を設定できる
+・67 行目あたりで出力する時間の間隔、長さを調整できる
+・INITIAL の値を変えることで初期条件を選べる
+・BOUNDARY で境界条件を選択できるが fixed は試作中
+・IMCOMPRESSIBLE を 0 にすると 連続の式を切って比較することができる
+
+[出力形式]
+・相対パス "./data/condition.txt" 中に以下の形式で計算条件を出力
+NX NY FRAMES
+Lx Ly Re mu
+ただし、NX, NY は出力する格子点の数で FRAMES は出力した回数
+
+・"./data/u.txt" に以下の形式で u の計算結果を出力
+time1
+（時刻 time1 での配列 u ）
+time2
+（時刻 time2 での配列 u ）
+（以下略）
+
+・v, p, rot, div についても同様
+*/
+
 #define _USE_MATH_DEFINES
 #include <cstdio>
 #include <cmath>
@@ -21,9 +46,9 @@ const int IMCOMPRESSIBLE = 1;
 
 
 /******************************計算条件******************************/
-// nx, ny は100くらいなら1分程度で終わる
-const int nx = 200+5;
-const int ny = 200+5;
+// nx, ny は100くらいなら1分程度で終わる 200 くらいが精度良さそうだけど7分くらいかかる
+const int nx = 100+5;
+const int ny = 100+5;
 const double Lx = 1.0;
 const double Ly = 1.0;
 const double dx = Lx/double(nx-5);
@@ -39,8 +64,8 @@ const double mu = 0.20;
 TIME に配列 (DT, 2DT, ..., ENDTIME) をsetする
 */
 const double T_EPS = 1.0e-10;
-const double DT = 0.05;
-const double ENDTIME = 2.0;
+const double DT = 0.02;
+const double ENDTIME = 10.0;
 vd TIME;
 //出力時刻を set する関数
 void TIME_set();
@@ -105,9 +130,6 @@ int main(){
   clock_t start_t, end_t;
   start_t = time(NULL);
 
-  // ランダム変数のシードは時刻から取る、つまり毎回違うシード
-  srand((unsigned)time(NULL));
-
   initial(u, v);
   boundary(u, v);
   TIME_set();
@@ -120,7 +142,7 @@ int main(){
 
   do{
     
-    printf("time:%f\n", t);
+    //printf("time:%f\n", t);
 
     {// x方向に移流
       x_advection(u, un, u, dt);
@@ -163,7 +185,7 @@ int main(){
       ti++; icnt++;
     }
 
-  } while (t < ENDTIME + DT);
+  } while (t < ENDTIME + dt);
 
   printf("number of pictures:%d\n", icnt);
   fprintf(condition_fp, "%d %d %d\n%f %f %f %f\n", nx-4, ny-4, icnt, Lx, Ly, Re, mu);
