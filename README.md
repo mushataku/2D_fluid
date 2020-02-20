@@ -2,7 +2,7 @@
 Solving 2D Navier-Stokes equation by Fractional Step method, and making gih animes.
 
 # Demo
-![result](https://github.com/mushataku/2D_fluid/blob/images/)
+![result](https://github.com/mushataku/2D_fluid/blob/images/Re10000.gif)
 
 # Usage
 
