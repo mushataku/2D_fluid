@@ -19,7 +19,7 @@ python imcompressible_quiver_anime.py
 * C++ 14
 
 # Note
-I'm explaining about the method this calculation in [Qiita](https://qiita.com/takuya000885/items/9150d96c9eec6da36f51)
+I'm explaining about the method of this calculation in [Qiita](https://qiita.com/takuya000885/items/9150d96c9eec6da36f51)
 
 # Author
 * Takuya Mushano
