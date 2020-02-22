@@ -1,4 +1,4 @@
-# Double Pendulum
+# 2D Fluid Analysis
 Solving 2D Navier-Stokes equation by Fractional Step method, and making gih animes.
 
 # Demo
