@@ -23,4 +23,4 @@ I'm explaining about the method of this calculation in [Qiita](https://qiita.com
 
 # Author
 * Takuya Mushano
-* s1611068@u.tsukuba.ac.jp
+* s2020190@s.tsukuba.ac.jp
